@@ -9,7 +9,20 @@ export default async function handler(req: any, res: any) {
     }
 
     try {
-        const { personBase64, personMimeType, outfitBase64, outfitMimeType } = req.body;
+        // Netlify Functions running on Node.js might not automatically parse
+        // the request body. We'll handle both string and object bodies to be safe.
+        let body;
+        if (typeof req.body === 'string') {
+            try {
+                body = JSON.parse(req.body);
+            } catch (e) {
+                return res.status(400).json({ error: 'Invalid JSON in request body.' });
+            }
+        } else {
+            body = req.body;
+        }
+
+        const { personBase64, personMimeType, outfitBase64, outfitMimeType } = body || {};
 
         if (!personBase64 || !personMimeType || !outfitBase64 || !outfitMimeType) {
             return res.status(400).json({ error: "Missing required image data in request body." });
