@@ -1,0 +1,9 @@
+{
+  "name": "virtual-try-on-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "An application that allows users to upload a photo of themselves and an outfit, then uses AI to generate an image of them wearing the outfit.",
+  "dependencies": {
+    "@google/genai": "^1.16.0"
+  }
+}
