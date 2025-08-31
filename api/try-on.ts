@@ -1,37 +1,45 @@
+import type { Handler } from "@netlify/functions";
 import { GoogleGenAI, Modality } from "@google/genai";
 
-// This is a serverless function that will be deployed as a backend endpoint.
-// It is designed to work with platforms like Vercel or Netlify.
-export default async function handler(req: any, res: any) {
-    if (req.method !== 'POST') {
-        res.setHeader('Allow', ['POST']);
-        return res.status(405).end(`Method ${req.method} Not Allowed`);
+// This function is now written using Netlify's native Handler format for maximum compatibility.
+export const handler: Handler = async (event, context) => {
+    if (event.httpMethod !== 'POST') {
+        return {
+            statusCode: 405,
+            headers: { 'Allow': 'POST' },
+            body: `Method ${event.httpMethod} Not Allowed`,
+        };
     }
 
     try {
-        // Netlify Functions running on Node.js might not automatically parse
-        // the request body. We'll handle both string and object bodies to be safe.
-        let body;
-        if (typeof req.body === 'string') {
-            try {
-                body = JSON.parse(req.body);
-            } catch (e) {
-                return res.status(400).json({ error: 'Invalid JSON in request body.' });
-            }
-        } else {
-            body = req.body;
+        if (!event.body) {
+            return {
+                statusCode: 400,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ error: 'Request body is empty.' }),
+            };
         }
 
-        const { personBase64, personMimeType, outfitBase64, outfitMimeType } = body || {};
+        // On Netlify, event.body is a string that needs to be parsed.
+        const body = JSON.parse(event.body);
+        const { personBase64, personMimeType, outfitBase64, outfitMimeType } = body;
 
         if (!personBase64 || !personMimeType || !outfitBase64 || !outfitMimeType) {
-            return res.status(400).json({ error: "Missing required image data in request body." });
+            return {
+                statusCode: 400,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ error: "Missing required image data in request body." }),
+            };
         }
 
         const API_KEY = process.env.API_KEY;
         if (!API_KEY) {
             console.error("API_KEY environment variable not set on the server");
-            return res.status(500).json({ error: "Server configuration error: Missing API key." });
+            return {
+                statusCode: 500,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ error: "Server configuration error: Missing API key." }),
+            };
         }
 
         const ai = new GoogleGenAI({ apiKey: API_KEY });
@@ -39,11 +47,11 @@ export default async function handler(req: any, res: any) {
 
         const prompt = `
             Virtual Try-On Task:
-            1.  The first image contains a person who will act as the model.
-            2.  The second image contains an outfit.
-            3.  Your task is to generate a new, photorealistic image of the person from the first image wearing the complete outfit from the second image.
-            4.  Preserve the person's original pose, background, face, and body features.
-            5.  The final image should only contain the person wearing the new outfit, without any extra text or annotations. Ensure the clothing fits naturally.
+            1. The first image contains a person who will act as the model.
+            2. The second image contains an outfit.
+            3. Your task is to generate a new, photorealistic image of the person from the first image wearing the complete outfit from the second image.
+            4. Preserve the person's original pose, background, face, and body features.
+            5. The final image should only contain the person wearing the new outfit, without any extra text or annotations. Ensure the clothing fits naturally.
         `;
 
         const response = await ai.models.generateContent({
@@ -59,24 +67,36 @@ export default async function handler(req: any, res: any) {
                 responseModalities: [Modality.IMAGE, Modality.TEXT],
             },
         });
-        
+
         const imagePart = response.candidates?.[0]?.content?.parts?.find(
             (part) => part.inlineData
         );
 
         if (imagePart && imagePart.inlineData) {
-            return res.status(200).json({ image: imagePart.inlineData.data });
+            return {
+                statusCode: 200,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: imagePart.inlineData.data }),
+            };
         } else {
             const textPart = response.candidates?.[0]?.content?.parts?.find(
                 (part) => part.text
             );
             const errorMessage = textPart?.text ?? "No image was generated by the API. The response may have been blocked or the format is unexpected.";
             console.error("Gemini API did not return an image:", errorMessage);
-            return res.status(500).json({ error: `AI could not generate image: ${errorMessage}` });
+            return {
+                statusCode: 500,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ error: `AI could not generate image: ${errorMessage}` }),
+            };
         }
     } catch (error) {
         console.error("Error in API route:", error);
         const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
-        return res.status(500).json({ error: `Server error: ${message}` });
+        return {
+            statusCode: 500,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: `Server error: ${message}` }),
+        };
     }
-}
+};

@@ -5,5 +5,8 @@
   "description": "An application that allows users to upload a photo of themselves and an outfit, then uses AI to generate an image of them wearing the outfit.",
   "dependencies": {
     "@google/genai": "^1.16.0"
+  },
+  "devDependencies": {
+    "@netlify/functions": "^2.0.0"
   }
 }
